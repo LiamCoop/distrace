@@ -32,9 +32,7 @@ func NewConsumer(cfg config.KafkaConfig, spanChan chan models.ParsedSpan) *Consu
 		StartOffset: kafka.LastOffset,
 		MinBytes: 10e3,
 		MaxBytes: 10e6,
-		MaxWait: 1 * time.Second,
-		Logger: kafka.LoggerFunc(log.Printf),
-		ErrorLogger: kafka.LoggerFunc(log.Printf),
+		MaxWait: 5 * time.Second,
 	})
 
 	return &Consumer{
