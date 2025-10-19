@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	otlpcollectortrace "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -19,12 +19,13 @@ import (
 )
 
 type Consumer struct {
+	logger *slog.Logger
 	reader *kafka.Reader
 	config config.KafkaConfig
 	spanCh chan<- models.ParsedSpan	
 }
 
-func NewConsumer(cfg config.KafkaConfig, spanChan chan models.ParsedSpan) *Consumer {
+func NewConsumer(cfg config.KafkaConfig, logger *slog.Logger, spanChan chan models.ParsedSpan) *Consumer {
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: cfg.Brokers,
 		Topic: cfg.Topic,
@@ -36,6 +37,7 @@ func NewConsumer(cfg config.KafkaConfig, spanChan chan models.ParsedSpan) *Consu
 	})
 
 	return &Consumer{
+		logger: logger,
 		reader: r,
 		config: cfg,
 		spanCh: spanChan,
@@ -45,24 +47,24 @@ func NewConsumer(cfg config.KafkaConfig, spanChan chan models.ParsedSpan) *Consu
 func (c *Consumer) Start(ctx context.Context) error {
 	defer c.reader.Close()
 
-	log.Printf("Starting kafka consumer for topic: %s", c.config.Topic)
+	c.logger.Info("Starting kafka consumer", slog.String("topic", c.config.Topic))
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Consumer context cancelled, shutting down")
+			c.logger.Info("Consumer context cancelled, shutting down")
 			return ctx.Err()
 
 		default:
 			// read
 			msg, err := c.reader.ReadMessage(ctx)
 			if err != nil {
-				log.Printf("Error reading message: %v", err)
+				c.logger.Error("Error reading message")
 				continue
 			}
 
 			if err := c.processMessage(msg); err != nil {
-				log.Printf("Error processing message: %v", err)
+				c.logger.Error("Error processing message")
 			}
 		}
 	}

@@ -18,33 +18,17 @@ type Trace struct {
 
 // handle hierarchical representation of spans
 type SpanTree struct {
-	Span     *ParsedSpan
+	ParsedSpan
 	Children []*SpanTree
 }
 
 type IncompleteTrace struct {
-	TraceID      string                   `json:""`
-	Spans        map[string](*ParsedSpan) `json:""`
-	RootSpan     *ParsedSpan              `json:""`
-	LastActivity time.Time                `json:""`
-	StartTime    time.Time                `json:""`
-	startTime    time.Time                `json:""`
-	Services     map[string]bool          `json:""`
-}
-
-type Span struct {
-	traceId      string     `json:""`
-	spanId       string     `json:""`
-	parentSpanId string     `json:""`
-	startTime    string     `json:""`
-	endTime      string     `json:""`
-	status       string     `json:""`
-	attributes   Attributes `json:""`
-}
-
-type Attributes struct {
-	method string `json:""`
-	userId string `json:""`
+	TraceID      string                 `json:""`
+	Spans        map[string]*ParsedSpan `json:""`
+	RootSpan     *ParsedSpan            `json:""`
+	LastActivity time.Time              `json:""`
+	StartTime    time.Time              `json:""`
+	EndTime      time.Time              `json:""`
 }
 
 type ParsedSpan struct {
