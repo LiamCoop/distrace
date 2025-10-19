@@ -10,6 +10,7 @@ import (
 
 	"github.com/liamcoop/distrace/internal/config"
 	"github.com/liamcoop/distrace/internal/kafka"
+	"github.com/liamcoop/distrace/internal/correlation"
 	"github.com/liamcoop/distrace/internal/models"
 )
 
@@ -17,10 +18,11 @@ func main() {
 	cfg := config.Load()
 
 
-	spanC := make(chan models.ParsedSpan)
-
-	c := kafka.NewConsumer(cfg.Kafka, spanC)
 	ctx, cancel := context.WithCancel(context.Background())
+
+	spanC := make(chan models.ParsedSpan)
+	c := kafka.NewConsumer(cfg.Kafka, spanC)
+
 
 	go func() {
 		if err := c.Start(ctx); err != nil {
@@ -28,10 +30,12 @@ func main() {
 		}
 	}()
 
+
+	correlator := correlation.New(spanC)
+
 	go func() {
-		for span := range spanC {
-			log.Printf("Received span: %+v\n", span)
-			time.Sleep(2 * time.Second)
+		if err := correlator.Start(); err != nil {
+			log.Printf("Correlator error: %v", err)
 		}
 	}()
 

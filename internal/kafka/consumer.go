@@ -155,7 +155,7 @@ func (c *Consumer) parseSpan(span *otlptrace.Span, serviceName string) *models.P
             Message: statusMessage,
         },
         Tags: tags,
-        Kind: span.Kind.String(),
+        Kind: models.ParseSpanKind(span.Kind.String()),
     }
 }
 
