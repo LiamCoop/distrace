@@ -2,49 +2,61 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/liamcoop/distrace/internal/config"
-	"github.com/liamcoop/distrace/internal/kafka"
 	"github.com/liamcoop/distrace/internal/correlation"
+	"github.com/liamcoop/distrace/internal/kafka"
+	"github.com/liamcoop/distrace/internal/logging"
 	"github.com/liamcoop/distrace/internal/models"
 )
 
 func main() {
 	cfg := config.Load()
 
-
+	logger := logging.Init()
 	ctx, cancel := context.WithCancel(context.Background())
 
-	spanC := make(chan models.ParsedSpan)
-	c := kafka.NewConsumer(cfg.Kafka, spanC)
+	spanCh := make(chan models.ParsedSpan)
+	traceCh := make(chan models.Trace)
 
+	consumer := kafka.NewConsumer(cfg.Kafka, logger, spanCh)
+	correlator := correlation.NewCorrelationEngine(logger, spanCh, traceCh)
 
 	go func() {
-		if err := c.Start(ctx); err != nil {
-			log.Printf("Consumer error: %v", err)
+		if err := consumer.Start(ctx); err != nil {
+			logger.Error("Consumer error", slog.String("error", err.Error()))
 		}
 	}()
 
-
-	correlator := correlation.New(spanC)
+	go func() {
+		if err := correlator.Start(ctx); err != nil {
+			logger.Error("Correlator error", slog.String("error", err.Error()))
+		}
+	}()
 
 	go func() {
-		if err := correlator.Start(); err != nil {
-			log.Printf("Correlator error: %v", err)
+		for {
+			trace, ok := <-traceCh
+			if !ok {
+				logger.Info("Trace channel closed, stopping trace monitor")
+				return
+			}
+			logger.Info("trace output",
+				slog.Any("trace", trace),
+			)
 		}
 	}()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	log.Println("Trace monitor started")
+	logger.Info("Trace monitor started")
 	<-sigChan
 
-	log.Println("Shutting down...")
+	logger.Info("Shutting down...")
 	cancel()
 }
